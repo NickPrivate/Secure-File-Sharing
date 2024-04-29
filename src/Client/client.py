@@ -2,9 +2,12 @@ import socket
 
 HOST = '127.0.0.1'
 PORT = 9999
-
-client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client.connect((HOST, PORT))
+try:
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client.connect((HOST, PORT))
+except:
+    print("Connection Failed, Server is not Running")
+    exit()
 
 try:
     while True:
