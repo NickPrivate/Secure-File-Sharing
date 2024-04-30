@@ -8,24 +8,31 @@ import threading
 HOST = '127.0.0.1'
 PORT = 9999
 
-def domain_handle(client_socket,cur):
+def domain_handle(client_socket, cur, user_id):
     while True:
-        client_socket.send("Plese enter your domain name: ".encode())
-        domain = client_socket.recv(1024).decode()
-        client_socket.send("Plese enter your port number: ".encode())
-        port = client_socket.recv(1024).decode()
+        client_socket.send("Please enter your domain name: ".encode())
+        domain = client_socket.recv(1024).decode().strip()
+        client_socket.send("Please enter your port number: ".encode())
+        port = client_socket.recv(1024).decode().strip()
 
-        cur.execute("SELECT * FROM Peers WHERE domain_name=?", (domain,))
-        if cur.fetchone() is not None:
-            client_socket.send("Domain already taken. Try a different domain.\n".encode())
+        try:
+            port = int(port)
+            if not 0 < port < 65536:
+                raise ValueError("Port number must be between 1 and 65535")
+        except ValueError as e:
+            client_socket.send(f"Invalid port number: {e}\n".encode())
+            continue
 
-        else:
-            cur.execute("INSERT INTO Peers (domain_name, port) VALUES (?, ?)", (domain, port))
-            cur.connection.commit()
-            client_socket.send("Domain and Port successfully sent!\n".encode())
-            print(f"Registered Domain: {domain}")
-            print(f"Registered Port: {port}")
+        cur.execute("SELECT * FROM Peers WHERE user_id=?", (user_id,))
+        if cur.fetchone():
+            cur.execute("UPDATE Peers SET domain_name=?, port=? WHERE user_id=?", (domain, port, user_id))
             break
+        else:
+            cur.execute("INSERT INTO Peers (user_id, domain_name, port) VALUES (?, ?, ?)", (user_id, domain, port))
+            break
+    cur.connection.commit()
+    client_socket.send("Domain and port updated successfully!\n".encode())
+    print(f"UserID: {user_id} | Domain: {domain} | Port: {port}")
 
 def handle_registration(client_socket, cur):
     while True:
@@ -45,11 +52,12 @@ def handle_registration(client_socket, cur):
         else:
             cur.execute("INSERT INTO Users (username, password) VALUES (?, ?)", (username, hashed_password))
             cur.connection.commit()
+            user_id = cur.lastrowid
+            cur.execute("INSERT INTO Peers (user_id, domain_name, port) VALUES (?, NULL, NULL)", (user_id,))
+            cur.connection.commit()
             client_socket.send("Registration successful!\n".encode())
-            print(f"Registered username: {username}")
-            print(f"Registered hashed password: {hashed_password}")
-            break
-
+            print(f"UserID: {user_id} | Registered Username: {username} | Registered Password hash: {password}")
+            return user_id
 
 def handle_login(client_socket, cur):
     while True:
@@ -64,9 +72,12 @@ def handle_login(client_socket, cur):
         hashed_password = hashlib.sha256(password.encode()).hexdigest()
 
         cur.execute("SELECT * FROM Users WHERE username=? AND password=?", (username, hashed_password))
-        if cur.fetchone():
+        result = cur.fetchone()
+        if result: 
+            user_id = result[0]
             client_socket.send("Login Successful!\n".encode())
-            break
+            print(f"UserID: {user_id} | Registered Username: {username} | Registered Password hash: {password}")
+            return user_id
         else:
             client_socket.send("Login Failed. Try again.\n".encode())
 
@@ -86,20 +97,18 @@ def handle_client(client_socket):
         while True:
             message = client_socket.recv(1024).decode().strip()
             if message == '1':
-                handle_registration(client_socket, cur)
-                domain_handle(client_socket,cur)
+                user_id = handle_registration(client_socket, cur)
+                domain_handle(client_socket, cur, user_id)
                 break
             elif message == '2':
-                handle_login(client_socket, cur)
-                domain_handle(client_socket, cur)
+                user_id = handle_login(client_socket, cur)
+                domain_handle(client_socket, cur, user_id)
                 break
             else:
                 client_socket.send("Please enter 1 or 2\n".encode())
     finally:
         client_socket.close()
         conn.close()
-
-
 
 # Todo ------------------------
 '''

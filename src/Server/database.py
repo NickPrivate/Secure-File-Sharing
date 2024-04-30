@@ -32,7 +32,6 @@ def init_db():
         FOREIGN KEY (peer_id) REFERENCES Peers(user_id)
     )
     ''')
-
 def get_all_tables():
     conn = sqlite3.connect('indexing_server.db')
     cursor = conn.cursor()
@@ -45,6 +44,7 @@ def get_all_tables():
     print("Users Table:")
     print(x)
 
+    cursor.execute("SELECT * FROM Peers")
     y = PrettyTable()
     y.field_names = [description[0] for description in cursor.description]
     for row in cursor.fetchall():
@@ -101,4 +101,5 @@ def reset_database():
     conn.close()
     print("Database has been reset.")
 
+reset_database()
 get_all_tables()
