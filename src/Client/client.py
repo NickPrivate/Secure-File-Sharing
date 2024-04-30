@@ -1,4 +1,5 @@
 import socket
+import time
 
 HOST = '127.0.0.1'
 PORT = 9999
@@ -11,6 +12,7 @@ except:
 
 try:
     while True:
+        time.sleep(0.1)
         message = client.recv(1024).decode()
         if message:
             print(message)
