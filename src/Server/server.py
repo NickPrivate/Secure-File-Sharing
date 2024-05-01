@@ -99,10 +99,12 @@ def handle_client(client_socket):
             if message == '1':
                 user_id = handle_registration(client_socket, cur)
                 domain_handle(client_socket, cur, user_id)
+                upload_files(client_socket, cur, user_id)
                 break
             elif message == '2':
                 user_id = handle_login(client_socket, cur)
                 domain_handle(client_socket, cur, user_id)
+                upload_files(client_socket, cur, user_id)
                 break
             else:
                 client_socket.send("Please enter 1 or 2\n".encode())
@@ -110,20 +112,50 @@ def handle_client(client_socket):
         client_socket.close()
         conn.close()
 
-# Todo ------------------------
-'''
-def upload_files(client_socket, cur):
+
+def upload_files(client_socket, cur, user_id):
     while True:
         client_socket.send("Enter the number of files you want to upload: ".encode())
-        num_of_files = int(client_socket.recv(1024).decode())
-        for i in range(0,num_of_files):
-            client_socket.send(f"Enter the name of file {i} :".encode())
-            file_name = client_socket.recv(1024).decode())
-            client_socket.send(f"Enter the keyword of file {i} :".encode())
-            keyword_name = client_socket.recv(1024).decode())
-            pass
+        num_of_files = client_socket.recv(1024).decode().strip()
 
-'''
+        if not num_of_files.isdigit():
+            client_socket.send("Error: enter a number".encode())
+            continue
+        num_of_files = int(num_of_files)
+        for i in range (1, num_of_files + 1):
+            client_socket.send(f"Enter the name of file {i}:".encode())
+            file_name = client_socket.recv(1024).decode().strip()
+            if not file_name:
+                client_socket.send("Error file cannot be empty\n".encode())
+                continue
+
+            client_socket.send(f"Enter the keyword of file {i}:".encode())
+            keyword_name = client_socket.recv(1024).decode().strip()
+            if not keyword_name:
+                client_socket.send("Error the keyword cannot be empty\n".encode())
+                continue
+
+            cur.execute("INSERT INTO Files (file_name, keyword, peer_id) VALUES (?, ?, ?)", (file_name, keyword_name, user_id))
+
+        client_socket.send("Are you finished sending files? Type Y/N: ".encode())
+
+        y_or_no = client_socket.recv(1024).decode().strip()
+
+        if y_or_no.lower() == "y":
+            cur.connection.commit()
+            client_socket.send("File upload completed.\n".encode())
+            print("FILE UPLOAD SUCCESS")
+            break
+        else:
+            continue
+
+# TODO -------------------
+# Ask user how many files they want to search for
+# Ask user to serach for a keyword
+# Query the keyword, join on domain/port/userid ... etc.
+
+def user_query(client_socket, cur, user_id):
+    pass
 
 def start_server():
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

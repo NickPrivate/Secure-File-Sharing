@@ -101,5 +101,4 @@ def reset_database():
     conn.close()
     print("Database has been reset.")
 
-reset_database()
 get_all_tables()
