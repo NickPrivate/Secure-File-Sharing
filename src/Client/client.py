@@ -16,8 +16,13 @@ try:
         message = client.recv(1024).decode()
         if message:
             print(message)
-            response = input()
-            client.send(response.encode())
+            while True:
+                response = input().strip()
+                if response:
+                    client.send(response.encode())
+                    break
+                else:
+                    print("No input detected")
         else:
             break
 finally:

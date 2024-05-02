@@ -1,4 +1,5 @@
 '''import os'''
+from prettytable import PrettyTable
 
 import socket
 import hashlib
@@ -10,7 +11,7 @@ PORT = 9999
 
 def domain_handle(client_socket, cur, user_id):
     while True:
-        client_socket.send("Please enter your domain name: ".encode())
+        client_socket.send("To upload files please enter your domain name: ".encode())
         domain = client_socket.recv(1024).decode().strip()
         client_socket.send("Please enter your port number: ".encode())
         port = client_socket.recv(1024).decode().strip()
@@ -33,6 +34,7 @@ def domain_handle(client_socket, cur, user_id):
     cur.connection.commit()
     client_socket.send("Domain and port updated successfully!\n".encode())
     print(f"UserID: {user_id} | Domain: {domain} | Port: {port}")
+
 
 def handle_registration(client_socket, cur):
     while True:
@@ -59,6 +61,7 @@ def handle_registration(client_socket, cur):
             print(f"UserID: {user_id} | Registered Username: {username} | Registered Password hash: {password}")
             return user_id
 
+
 def handle_login(client_socket, cur):
     while True:
         client_socket.send("Enter Username: ".encode())
@@ -82,37 +85,6 @@ def handle_login(client_socket, cur):
             client_socket.send("Login Failed. Try again.\n".encode())
 
 
-def handle_client(client_socket):
-    conn = sqlite3.connect("indexing_server.db")
-    cur = conn.cursor()
-
-    try:
-        menu = ("Welcome to Secure File Sharing\n"
-                "------------------------------\n"
-                "Type 1 to register or type 2 to login\n"
-                "1 - Register\n"
-                "2 - Login\n")
-        client_socket.send(menu.encode())
-        
-        while True:
-            message = client_socket.recv(1024).decode().strip()
-            if message == '1':
-                user_id = handle_registration(client_socket, cur)
-                domain_handle(client_socket, cur, user_id)
-                upload_files(client_socket, cur, user_id)
-                break
-            elif message == '2':
-                user_id = handle_login(client_socket, cur)
-                domain_handle(client_socket, cur, user_id)
-                upload_files(client_socket, cur, user_id)
-                break
-            else:
-                client_socket.send("Please enter 1 or 2\n".encode())
-    finally:
-        client_socket.close()
-        conn.close()
-
-
 def upload_files(client_socket, cur, user_id):
     while True:
         client_socket.send("Enter the number of files you want to upload: ".encode())
@@ -121,6 +93,7 @@ def upload_files(client_socket, cur, user_id):
         if not num_of_files.isdigit():
             client_socket.send("Error: enter a number".encode())
             continue
+
         num_of_files = int(num_of_files)
         for i in range (1, num_of_files + 1):
             client_socket.send(f"Enter the name of file {i}:".encode())
@@ -149,13 +122,107 @@ def upload_files(client_socket, cur, user_id):
         else:
             continue
 
-# TODO -------------------
-# Ask user how many files they want to search for
-# Ask user to serach for a keyword
-# Query the keyword, join on domain/port/userid ... etc.
 
 def user_query(client_socket, cur, user_id):
-    pass
+    client_socket.send("How many files do you want to query?: ".encode())
+    number_of_files = client_socket.recv(1024).decode().strip()
+
+    if not number_of_files.isdigit() or int(number_of_files) > 10:
+        client_socket.send("Error, enter a whole number less than 10\n".encode())
+        return
+
+    number_of_files = int(number_of_files)
+    keyword_list = []
+
+    for i in range(1, number_of_files + 1):
+        client_socket.send(f"Enter the Keyword for file {i}: ".encode())
+        keyword = client_socket.recv(1024).decode().strip()
+        if keyword:
+            keyword_list.append(keyword)
+
+    if not keyword_list:
+        client_socket.send("No valid keywords entered.\n".encode())
+        return
+
+    table = PrettyTable(["File Name", "Keyword", "Domain Name", "Port", "Uploaded by"])
+    any_results = False
+
+    for keyword in keyword_list:
+        cur.execute("""
+                    SELECT Files.file_name, Files.keyword, Peers.domain_name, Peers.port, Users.username 
+                    FROM Files
+                    JOIN Peers ON Files.peer_id = Peers.user_id 
+                    JOIN Users ON Peers.user_id = Users.user_id 
+                    WHERE Files.keyword = ? AND Users.user_id = ?""",
+                    (keyword, user_id))
+        results = cur.fetchall()
+        if results:
+            any_results = True
+            for result in results:
+                table.add_row(result)
+        else:
+            table.add_row([None, keyword, None, None, "No results found"])
+
+    if any_results:
+        client_socket.send(b"\n" + table.get_string().encode() + b"\n\n")
+    else:
+        client_socket.send("No results found for any keywords.\n".encode())
+
+    print(f"UserID {user_id} queried {number_of_files} {'files' if number_of_files > 1 else 'file'}")
+
+
+def handle_client(client_socket):
+    conn = sqlite3.connect("indexing_server.db")
+    cur = conn.cursor()
+
+    try:
+        menu = ("Welcome to Secure File Sharing\n"
+                "------------------------------\n"
+                "Type 1 to register or type 2 to login\n"
+                "1 - Register\n"
+                "2 - Login\n")
+
+        while True:
+            client_socket.send(menu.encode())
+            message = client_socket.recv(1024).decode()
+            if not message:
+                continue
+            elif message == '1':
+                user_id = handle_registration(client_socket, cur)
+                break
+            elif message == '2':
+                user_id = handle_login(client_socket, cur)
+                break
+            else:
+                client_socket.send("Please enter 1 or 2\n".encode())
+                continue
+
+        menu_dashboard = ("Welcome to The Dashboard\n"
+                "------------------------------\n"
+                "Type 1 to upload or type 2 to query or type 3 to quit\n"
+                "1 - Upload Files\n"
+                "2 - Query\n"
+                "3 - Quit\n")
+
+        while True:
+            client_socket.send(menu_dashboard.encode())
+            message = client_socket.recv(1024).decode().strip()
+            if message == '1':
+                domain_handle(client_socket, cur, user_id)
+                upload_files(client_socket, cur, user_id)
+                continue
+            elif message == '2':
+                user_query(client_socket, cur, user_id)
+                continue
+            elif message == '3':
+                break
+            else:
+                client_socket.send("Please enter 1 or 2\n".encode())
+                continue
+    finally:
+        print("User Disconnected")
+        client_socket.close()
+        conn.close()
 
 def start_server():
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
