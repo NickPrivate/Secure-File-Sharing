@@ -11,7 +11,7 @@ PORT = 9999
 
 def domain_handle(client_socket, cur, user_id):
     while True:
-        client_socket.send("To upload files please enter your domain name: ".encode())
+        client_socket.send("To upload files please enter your domain name (IP Address): ".encode())
         domain = client_socket.recv(1024).decode().strip()
         client_socket.send("Please enter your port number: ".encode())
         port = client_socket.recv(1024).decode().strip()
@@ -168,10 +168,10 @@ def user_query(client_socket, cur, user_id):
     else:
         client_socket.send("No results found for any keywords.\n".encode())
 
-    print(f"UserID {user_id} queried {number_of_files} {'files' if number_of_files > 1 else 'file'}")
+    print(f"UserID: {user_id} Queried {number_of_files} {'files' if number_of_files > 1 else 'file'}")
 
 
-def handle_client(client_socket):
+def handle_client(client_socket, user_id = None):
     conn = sqlite3.connect("indexing_server.db")
     cur = conn.cursor()
 
@@ -197,12 +197,21 @@ def handle_client(client_socket):
                 client_socket.send("Please enter 1 or 2\n".encode())
                 continue
 
-        menu_dashboard = ("Welcome to The Dashboard\n"
+        menu_dashboard = ("\nWelcome to The Dashboard\n"
                 "------------------------------\n"
-                "Type 1 to upload or type 2 to query or type 3 to quit\n"
+                "Type a number 1-5 to continue\n"
                 "1 - Upload Files\n"
+            
+            # TODO --------------
+            # Fix the bug when querying other people's files
+
                 "2 - Query\n"
-                "3 - Quit\n")
+
+
+
+                "3 - Send Files\n"
+                "4 - Request Files\n"
+                "5 - Quit\n")
 
         while True:
             client_socket.send(menu_dashboard.encode())
@@ -214,13 +223,37 @@ def handle_client(client_socket):
             elif message == '2':
                 user_query(client_socket, cur, user_id)
                 continue
+
             elif message == '3':
+                client_socket.send("Are you sure you want to send files? You will be disconnected from the indexing server Y/N".encode())
+                message = client_socket.recv(1024).decode().strip()
+                if message.lower() == 'y':
+                    client_socket.send("Entering File Send Mode".encode())
+                    client_socket.close()
+                    conn.close()
+                    break
+                else:
+                    continue
+
+            elif message == '4':
+                client_socket.send("Are you sure you want to request files? You will be disconnected from the indexing server Y/N".encode())
+                message = client_socket.recv(1024).decode().strip()
+                if message.lower() == 'y':
+                    client_socket.send("Entering File Request Mode".encode())
+                    client_socket.close()
+                    conn.close()
+                    break
+                else:
+                    continue
+
+            elif message == '5':
+                client_socket.send("__user_quits__".encode())
                 break
             else:
                 client_socket.send("Please enter 1 or 2\n".encode())
                 continue
     finally:
-        print("User Disconnected")
+        print(f"UserID: {user_id} | Disconnected")
         client_socket.close()
         conn.close()
 
