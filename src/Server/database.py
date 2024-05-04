@@ -7,9 +7,11 @@ def init_db():
 
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS Users (
-    user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL
+        user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        RSApublickey TEXT UNIQUE NOT NULL,
+        DSApublickey TEXT UNIQUE NOT NULL
     )
     ''')
 
@@ -32,6 +34,7 @@ def init_db():
         FOREIGN KEY (peer_id) REFERENCES Peers(user_id)
     )
     ''')
+
 def get_all_tables():
     conn = sqlite3.connect('indexing_server.db')
     cursor = conn.cursor()
@@ -71,9 +74,11 @@ def reset_database():
 
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS Users (
-    user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL
+        user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        RSApublickey TEXT UNIQUE NOT NULL,
+        DSApublickey TEXT UNIQUE NOT NULL
     )
     ''')
 

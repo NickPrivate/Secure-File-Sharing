@@ -1,5 +1,7 @@
-'''import os'''
 from prettytable import PrettyTable
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric import dsa
+from cryptography.hazmat.primitives import serialization
 
 import socket
 import hashlib
@@ -8,6 +10,49 @@ import threading
 
 HOST = '127.0.0.1'
 PORT = 9999
+
+
+def generate_dsa_keys():
+    private_key = dsa.generate_private_key(
+        key_size=2048
+    )
+
+    pem_private_key = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+
+    public_key = private_key.public_key()
+
+    pem_public_key = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+
+    return pem_private_key.decode('utf-8'), pem_public_key.decode('utf-8')
+
+def generate_rsa_keys():
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+
+    public_key = private_key.public_key()
+
+    pem_private = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+
+    pem_public = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+
+    return pem_private.decode('utf-8'), pem_public.decode('utf-8')
+
 
 def domain_handle(client_socket, cur, user_id):
     while True:
@@ -52,12 +97,15 @@ def handle_registration(client_socket, cur):
         if cur.fetchone() is not None:
             client_socket.send("Username already exists. Try a different username.\n".encode())
         else:
-            cur.execute("INSERT INTO Users (username, password) VALUES (?, ?)", (username, hashed_password))
+            DSAprivate_key, DSApublic_key = generate_dsa_keys()
+            RSAprivate_key, RSApublic_key = generate_rsa_keys()
+            cur.execute("INSERT INTO Users (username, password, RSApublickey, DSApublickey) VALUES (?, ?, ?, ?)", (username, hashed_password, RSApublic_key, DSApublic_key ))
             cur.connection.commit()
             user_id = cur.lastrowid
             cur.execute("INSERT INTO Peers (user_id, domain_name, port) VALUES (?, NULL, NULL)", (user_id,))
             cur.connection.commit()
             client_socket.send("Registration successful!\n".encode())
+            """client_socket.send(f"Your private key is: {private_key}".encode())"""
             print(f"UserID: {user_id} | Registered Username: {username} | Registered Password hash: {password}")
             return user_id
 
@@ -144,24 +192,24 @@ def user_query(client_socket, cur, user_id):
         client_socket.send("No valid keywords entered.\n".encode())
         return
 
-    table = PrettyTable(["File Name", "Keyword", "Domain Name", "Port", "Uploaded by"])
+    table = PrettyTable(["File Name", "Keyword", "Domain Name", "Port", "Uploaded by", "RSA Public Key", "DSA Public Key"])
     any_results = False
 
     for keyword in keyword_list:
         cur.execute("""
-                    SELECT Files.file_name, Files.keyword, Peers.domain_name, Peers.port, Users.username 
+                    SELECT Files.file_name, Files.keyword, Peers.domain_name, Peers.port, Users.username, Users.RSApublickey, Users.DSApublickey 
                     FROM Files
                     JOIN Peers ON Files.peer_id = Peers.user_id 
                     JOIN Users ON Peers.user_id = Users.user_id 
-                    WHERE Files.keyword = ? AND Users.user_id = ?""",
-                    (keyword, user_id))
+                    WHERE Files.keyword = ?""",
+                    (keyword,))
         results = cur.fetchall()
         if results:
             any_results = True
             for result in results:
                 table.add_row(result)
         else:
-            table.add_row([None, keyword, None, None, "No results found"])
+            table.add_row([None, keyword, None, None, "No results found", None, None])
 
     if any_results:
         client_socket.send(b"\n" + table.get_string().encode() + b"\n\n")
@@ -201,14 +249,7 @@ def handle_client(client_socket, user_id = None):
                 "------------------------------\n"
                 "Type a number 1-5 to continue\n"
                 "1 - Upload Files\n"
-            
-            # TODO --------------
-            # Fix the bug when querying other people's files
-
                 "2 - Query\n"
-
-
-
                 "3 - Send Files\n"
                 "4 - Request Files\n"
                 "5 - Quit\n")
@@ -253,7 +294,7 @@ def handle_client(client_socket, user_id = None):
                 client_socket.send("Please enter 1 or 2\n".encode())
                 continue
     finally:
-        print(f"UserID: {user_id} | Disconnected")
+        print(f"\nUserID: {user_id} | Disconnected\n")
         client_socket.close()
         conn.close()
 
@@ -265,7 +306,7 @@ def start_server():
     print(f"Listening on port {PORT}...")
     while True:
         client_socket, addr = server_socket.accept()
-        print(f"Connected to {addr}")
+        print(f"\nConnected to {addr}\n")
         client_thread = threading.Thread(target=handle_client, args=(client_socket,))
         client_thread.start()
 
