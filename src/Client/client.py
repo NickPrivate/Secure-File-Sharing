@@ -69,9 +69,9 @@ def generate_rsa_keys():
 
 def load_or_generate_keys():
     rsa_pub_path = 'rsa_public.pem'
-    rsa_priv_path = 'rsa_public.pem'
+    rsa_priv_path = 'rsa_private.pem'
     dsa_pub_path = 'dsa_public.pem'
-    dsa_priv_path = 'dsa_public.pem'
+    dsa_priv_path = 'dsa_private.pem'
     '''if os.path.exists(rsa_pub_path) and os.path.exists(dsa_pub_path):
         with open(rsa_pub_path, 'r') as f:
             RSApublic_key = f.read()
