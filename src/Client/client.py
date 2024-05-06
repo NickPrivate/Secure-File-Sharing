@@ -1,12 +1,14 @@
 from Crypto.Cipher import AES
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives.asymmetric import dsa
-from cryptography.hazmat.primitives import serialization
+from Crypto.Random import get_random_bytes
+from cryptography.hazmat.primitives.asymmetric import rsa, dsa, padding
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.exceptions import UnsupportedAlgorithm
 
 import os
 import socket
 import time
 
+FATAL_ERROR = "Fatal Error, Your keys are not unique, Restart program"
 file_send_string = "Entering File Send Mode"
 file_request_string = "Entering File Request Mode"
 quit_string = "__user_quits__"
@@ -43,7 +45,7 @@ def generate_dsa_keys():
         format=serialization.PublicFormat.SubjectPublicKeyInfo
     )
 
-    return pem_private_key.decode('utf-8'), pem_public_key.decode('utf-8')
+    return  pem_public_key.decode('utf-8'), pem_private_key.decode('utf-8')
 
 def generate_rsa_keys():
     private_key = rsa.generate_private_key(
@@ -64,21 +66,18 @@ def generate_rsa_keys():
         format=serialization.PublicFormat.SubjectPublicKeyInfo
     )
 
-    return pem_private.decode('utf-8'), pem_public.decode('utf-8')
+    return  pem_public.decode('utf-8'), pem_private.decode('utf-8')
 
+def generated_and_save():
 
-def load_or_generate_keys():
     rsa_pub_path = 'rsa_public.pem'
     rsa_priv_path = 'rsa_private.pem'
     dsa_pub_path = 'dsa_public.pem'
     dsa_priv_path = 'dsa_private.pem'
-    '''if os.path.exists(rsa_pub_path) and os.path.exists(dsa_pub_path):
-        with open(rsa_pub_path, 'r') as f:
-            RSApublic_key = f.read()
-        with open(dsa_pub_path, 'r') as f:
-            DSApublic_key = f.read()'''
-    RSAprivate_key, RSApublic_key = generate_rsa_keys()
-    DSAprivate_key, DSApublic_key = generate_dsa_keys()
+
+    RSApublic_key, RSAprivate_key = generate_rsa_keys()
+    DSApublic_key, DSAprivate_key = generate_dsa_keys()
+
     with open(rsa_pub_path, 'w') as f:
         f.write(RSApublic_key)
     with open(dsa_pub_path, 'w') as f:
@@ -90,58 +89,176 @@ def load_or_generate_keys():
 
     return RSApublic_key, DSApublic_key, RSAprivate_key, DSAprivate_key
 
-RSApublic_key, DSApublic_key, RSAprivate_key, DSAprivate_key = load_or_generate_keys()
+def load_or_generate_keys():
+    rsa_pub_path = 'rsa_public.pem'
+    rsa_priv_path = 'rsa_private.pem'
+    dsa_pub_path = 'dsa_public.pem'
+    dsa_priv_path = 'dsa_private.pem'
 
-try:
-    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client.connect((HOST, PORT))
+    if (
+        os.path.exists(rsa_pub_path)
+        and os.path.exists(dsa_pub_path)
+        and os.path.exists(rsa_priv_path)
+        and os.path.exists(dsa_priv_path)
+        ):
 
-    client.send(RSApublic_key.encode('utf-8'))
-    client.recv(1024).decode()
-    client.send(DSApublic_key.encode('utf-8'))
+        with open(rsa_pub_path, 'r') as f:
+            RSApublic_key = f.read()
+        with open(dsa_pub_path, 'r') as f:
+            DSApublic_key = f.read()
+        with open(rsa_priv_path, 'r') as f:
+            RSAprivate_key= f.read()
+        with open(dsa_priv_path, 'r') as f:
+            DSAprivate_key = f.read()
 
-    keys_sent_ack = client.recv(1024).decode()
-    if keys_sent_ack == "Both Keys Received":
-        print("Server acknowledged keys, proceeding...")
     else:
-        print("Did not receive correct acknowledgment from server, exiting...")
-        client.close()
-except:
-    print("Connection Failed, Server is not Running")
-    exit()
+        RSAprivate_key, RSApublic_key = generate_rsa_keys()
+        DSAprivate_key, DSApublic_key = generate_dsa_keys()
 
-try:
-    while True:
-        time.sleep(0.5)
-        message = receive_full_message(client).decode()
-        if message != quit_string and message != file_send_string and message != file_request_string and message != file_kw:
-            print(message)
-            while True:
-                response = input().strip()
-                if response:
-                    client.send(response.encode('utf-8'))
-                    break
-                else:
-                    print("No input detected")
-        elif message == file_kw:
-            response = input().strip()
-            client.send(response.encode('utf-8'))
-        elif message == file_send_string:
-            # TODO Create a function receiver() for the client that sends the file
-            print("THIS IS WHERE SEND LOGIC GOES")
-            break
-        elif message == file_request_string:
-            # TODO Create a function sender() for the client that receives the senders file 
-            print("THIS IS WHERE REQUEST LOGIC GOES")
-            break
-        else:
-            break
-finally:
-    client.close()
-    print("Disconnected from server.")
+        with open(rsa_pub_path, 'w') as f:
+            f.write(RSApublic_key)
+        with open(dsa_pub_path, 'w') as f:
+            f.write(DSApublic_key)
+        with open(rsa_priv_path, 'w') as f:
+            f.write(RSAprivate_key)
+        with open(dsa_priv_path, 'w') as f:
+            f.write(DSAprivate_key)
+
+    return RSApublic_key, DSApublic_key, RSAprivate_key, DSAprivate_key
+
+
+
+def generate_aes_key():
+    aes_key = get_random_bytes(16)
+    return aes_key
+
+def encrypt_aes_key(aes_key, senders_public_pem):
+    try:
+        senders_public_key = serialization.load_pem_public_key(
+            senders_public_pem.encode('utf-8')
+        )
+
+        if not isinstance(senders_public_key, rsa.RSAPublicKey):
+            raise ValueError("Provided public key is not an RSA public key. Encryption is not supported.")
+
+        encrypted_aes_key = senders_public_key.encrypt(
+            aes_key,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+        return encrypted_aes_key
+    except UnsupportedAlgorithm:
+        raise ValueError("Unsupported key type. Only RSA keys are supported for encryption.")
+
+
 
 def sender():
-    pass
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    domain_name = '127.0.0.1'
+    port = 5000
+    server_socket.bind((domain_name,port))
+    server_socket.listen(1)
+    print("Waiting for a connection...")
+    connection, client_address = server_socket.accept()
 
-def receiver():
-    pass
+    try:
+        print(f"Connection from {client_address}")
+        message = connection.recv(1024).decode('utf-8')
+        server_socket.send("Encrypted AES SUCCESS".encode())
+        print(message)
+    finally:
+        connection.close()
+        server_socket.close()
+
+
+def receiver(RSApublic_key):
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    domain_name = '127.0.0.1'
+    port = 5000
+
+    try:
+        client_socket.connect((domain_name, port))
+        client_socket.send(RSApublic_key.encode())
+        message = client_socket.recv(1024).decode()
+        if message == "Encrypted AES SUCCESS":
+            print("AES KEY SENT")
+        else:
+            print("Failed to transfer key")
+    except:
+        print("Receiver is not listening")
+        client_socket.close()
+
+
+def client_entry():
+    while True:
+        print("Before we connect to the server, do you want to update your keys?\n1 - Generate Keys\n2 - Use Existing Keys")
+        key_choice = input()
+        if key_choice == '1': 
+            RSApublic_key, DSApublic_key, RSAprivate_key, DSAprivate_key = generated_and_save()
+            break
+        elif key_choice == '2':
+            RSApublic_key, DSApublic_key, RSAprivate_key, DSAprivate_key = load_or_generate_keys()
+            break
+        else:
+            continue
+
+    try:
+        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client.connect((HOST, PORT))
+        client.send(key_choice.encode())
+        client.recv(1024).decode()
+
+        client.send(RSApublic_key.encode('utf-8'))
+        client.recv(1024).decode()
+        client.sendall(DSApublic_key.encode('utf-8'))
+
+        keys_sent_ack = client.recv(1024).decode()
+        if keys_sent_ack == "Both Keys Received":
+            print("Server acknowledged keys, proceeding...")
+        else:
+            print("Did not receive correct acknowledgment from server, exiting...")
+            client.close()
+    except:
+        print("Connection Failed, Server is not Running")
+        exit()
+
+    try:
+        while True:
+            time.sleep(0.5)
+            message = receive_full_message(client).decode()
+            if (message != quit_string
+                and message != file_send_string 
+                and message != file_request_string 
+                and message != file_kw
+                and message != FATAL_ERROR
+                ):
+
+                print(message)
+                while True:
+                    response = input().strip()
+                    if response:
+                        client.send(response.encode('utf-8'))
+                        break
+                    else:
+                        print("No input detected")
+            elif message == file_kw:
+                response = input().strip()
+                client.send(response.encode('utf-8'))
+            elif message == file_send_string:
+                sender()
+                break
+            elif message == file_request_string:
+                receiver(RSApublic_key)
+                break
+            else:
+                break
+    finally:
+        client.close()
+        print("Disconnected from server.")
+
+client_entry()
+
+

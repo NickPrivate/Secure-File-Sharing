@@ -35,6 +35,36 @@ def init_db():
     )
     ''')
 
+'''def get_all_tables():
+    conn = sqlite3.connect('indexing_server.db')
+    cursor = conn.cursor()
+
+    # Function to print table data in a simple format
+    def print_table_data(cursor, table_name):
+        print(f"\n{table_name} Table:")
+        # Fetch column headers
+        columns = [description[0] for description in cursor.description]
+        print('\t'.join(columns))  # Print column headers joined by tabs
+        # Fetch and print each row
+        for row in cursor.fetchall():
+            print('\t'.join(str(item) for item in row))
+
+    # Fetch and print Users table
+    cursor.execute("SELECT * FROM Users")
+    print_table_data(cursor, "Users")
+
+    # Fetch and print Peers table
+    cursor.execute("SELECT * FROM Peers")
+    print_table_data(cursor, "Peers")
+
+    # Fetch and print Files table
+    cursor.execute("SELECT * FROM Files")
+    print_table_data(cursor, "Files")
+
+    # Commit any changes and close the connection
+    conn.commit()
+    conn.close()'''
+
 def get_all_tables():
     conn = sqlite3.connect('indexing_server.db')
     cursor = conn.cursor()

@@ -51,6 +51,14 @@ def handle_registration(client_socket, cur, clientRSA, clientDSA):
         cur.execute("SELECT * FROM Users WHERE username=?", (username,))
         if cur.fetchone() is not None:
             client_socket.send("Username already exists. Try a different username.\n".encode('utf-8'))
+            continue
+
+        cur.execute("SELECT * FROM Users WHERE RSApublickey=?", (clientRSA,))
+        if cur.fetchone() is not None:
+            client_socket.send("Fatal Error, Your keys are not unique, Restart program".encode('utf-8'))
+            cur.close()
+            client_socket.close()
+
         else:
             cur.execute("INSERT INTO Users (username, password, RSApublickey, DSApublickey) VALUES (?, ?, ?, ?)", (username, hashed_password, clientRSA, clientDSA))
             cur.connection.commit()
@@ -63,7 +71,7 @@ def handle_registration(client_socket, cur, clientRSA, clientDSA):
             return user_id
 
 
-def handle_login(client_socket, cur, clientRSA, clientDSA):
+def handle_login(client_socket, cur, clientRSA, clientDSA, key_choice):
     while True:
         client_socket.send("Enter Username: ".encode('utf-8'))
         username = client_socket.recv(1024).decode().strip()
@@ -75,14 +83,23 @@ def handle_login(client_socket, cur, clientRSA, clientDSA):
             continue
         hashed_password = hashlib.sha256(password.encode('utf-8')).hexdigest()
 
+
         cur.execute("SELECT * FROM Users WHERE username=? AND password=?", (username, hashed_password))
         result = cur.fetchone()
-        if result: 
-#            cur.execute("UPDATE Users SET RSApublickey=?, DSApublickey=? WHERE username=?", (clientRSA, clientDSA, username))
+        if result and key_choice == '1': 
+            cur.execute("UPDATE Users SET RSApublickey=?, DSApublickey=? WHERE username=?", (clientRSA, clientDSA, username))
+            cur.connection.commit()
+            user_id = result[0]
+            client_socket.send("Login Successful && Keys Updated!\n".encode('utf-8'))
+            print(f"UserID: {user_id} | Registered Username: {username} | Registered Password hash: {password}")
+            return user_id
+
+        elif result and key_choice == '2': 
             user_id = result[0]
             client_socket.send("Login Successful!\n".encode('utf-8'))
             print(f"UserID: {user_id} | Registered Username: {username} | Registered Password hash: {password}")
             return user_id
+
         else:
             client_socket.send("Login Failed. Try again.\n".encode('utf-8'))
 
@@ -188,18 +205,20 @@ def receive_full_message(sock):
         sock.settimeout(None)
     return b''.join(buffer)
 
-def get_keys(client_socket):
-    RSA_key = client_socket.recv(1024).decode('utf-8')
-    client_socket.send("RSA Key Received".encode('utf-8'))
-    DSA_key = receive_full_message(client_socket).decode('utf-8')
-    client_socket.send("Both Keys Received".encode('utf-8'))
-    return RSA_key, DSA_key
 
 def handle_client(client_socket, user_id=None):
     conn = sqlite3.connect("indexing_server.db")
     cur = conn.cursor()
 
-    RSA_key, DSA_key = get_keys(client_socket)
+    key_choice = client_socket.recv(1024).decode()
+    client_socket.send("Key choice received".encode())
+
+
+    RSA_key = client_socket.recv(1024).decode('utf-8')
+    client_socket.send("RSA Key Received".encode('utf-8'))
+    DSA_key = receive_full_message(client_socket).decode('utf-8')
+    client_socket.send("Both Keys Received".encode('utf-8'))
+
     if RSA_key is None or DSA_key is None:
         print("Failed to get keys")
         client_socket.close()
@@ -220,7 +239,7 @@ def handle_client(client_socket, user_id=None):
                 user_id = handle_registration(client_socket, cur, RSA_key, DSA_key)
                 break
             elif message == '2':
-                user_id = handle_login(client_socket, cur, RSA_key, DSA_key)
+                user_id = handle_login(client_socket, cur, RSA_key, DSA_key, key_choice)
                 break
             else:
                 client_socket.send("Please enter 1 or 2\n".encode('utf-8'))
