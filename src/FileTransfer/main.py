@@ -18,11 +18,12 @@ def receive_full_message(sock):
             break
     return b''.join(buffer)
 
-def generate_aes_key():
+def generate_aes_key_and_nonce():
     aes_key = get_random_bytes(16)
-    return aes_key
+    nonce = get_random_bytes(16)
+    return aes_key, nonce
 
-def encrypt_aes_key(aes_key, senders_public_pem):
+def encrypt_aes_key(aes_key, nonce, senders_public_pem):
     try:
         senders_public_key = serialization.load_pem_public_key(
             senders_public_pem.encode('utf-8')
@@ -31,8 +32,10 @@ def encrypt_aes_key(aes_key, senders_public_pem):
         if not isinstance(senders_public_key, rsa.RSAPublicKey):
             raise ValueError("Provided public key is not an RSA public key. Encryption is not supported.")
 
+        data_to_encrypt = aes_key + nonce
+
         encrypted_aes_key = senders_public_key.encrypt(
-            aes_key,
+            data_to_encrypt,
             padding.OAEP(
                 mgf=padding.MGF1(algorithm=hashes.SHA256()),
                 algorithm=hashes.SHA256(),
@@ -43,7 +46,7 @@ def encrypt_aes_key(aes_key, senders_public_pem):
     except UnsupportedAlgorithm:
         raise ValueError("Unsupported key type. Only RSA keys are supported for encryption.")
 
-def decrypt_aes_key(encrypted_aes_key, private_key_pem):
+def decrypt_aes_key(encrypted_aes_key_and_nonce, private_key_pem):
 
     private_key = load_pem_private_key(
         private_key_pem.encode('utf-8'),
@@ -53,15 +56,21 @@ def decrypt_aes_key(encrypted_aes_key, private_key_pem):
     if not isinstance(private_key, rsa.RSAPrivateKey):
         raise TypeError("The provided key is not an RSA private key.")
 
-    aes_key = private_key.decrypt(
-        encrypted_aes_key,
+    decrypted_data = private_key.decrypt(
+        encrypted_aes_key_and_nonce,
         padding.OAEP(
             mgf=padding.MGF1(algorithm=hashes.SHA256()),
             algorithm=hashes.SHA256(),
             label=None
         )
     )
-    return aes_key
+    aes_key_length = 16
+    nonce_length = 16
+
+    aes_key = decrypted_data[:aes_key_length]
+    nonce = decrypted_data[aes_key_length:aes_key_length + nonce_length]
+
+    return aes_key, nonce
 
 def generate_dsa_keys():
     private_key = dsa.generate_private_key(
@@ -126,10 +135,10 @@ def sender():
         message = receiver_socket.recv(1024).decode()
 
         # 3 Generate AES KEY
-        secure_aes_key = generate_aes_key()
+        secure_aes_key, nonce = generate_aes_key_and_nonce()
 
         # 4 Encrypt AES KEY and Send IT
-        encrypted_aes_key = encrypt_aes_key(secure_aes_key, message)
+        encrypted_aes_key = encrypt_aes_key(secure_aes_key, nonce, message)
         receiver_socket.send(encrypted_aes_key)
 
         print("Received RSA Key")
@@ -137,23 +146,25 @@ def sender():
         # 7 Receive Acknowledgement
         message = receiver_socket.recv(1024).decode()
 
+        print(message)
 
-        file_name = input("Enter the name of the file you want to download:")
+        # 9 Get file name
+        file_name = receiver_socket.recv(1024).decode()
+        print(f"received file name{file_name}")
         file_size = os.path.getsize(file_name)
-
+        receiver_socket.send(str(file_size).encode())
+        # 10 store all of the file data in the variable
         with open(file_name, "rb") as f:
             data = f.read()
 
-        cipher = AES.new(secure_aes_key, AES.MODE_EAX)
+        cipher = AES.new(secure_aes_key, AES.MODE_EAX, nonce)
         encrypted_file = cipher.encrypt(data)
 
-        # 8 Encrypt the file with AES and send it 
-        receiver_socket.send("file.txt".encode())
-        receiver_socket.send(str(file_size).encode())
+        # 11 Encrypt the file with AES and send it 
         receiver_socket.sendall(encrypted_file)
         receiver_socket.send(b"<END>")
         print(encrypted_file)
-        print(message)
+        print("This is the encrypted file ^")
 
     finally:
         receiver_socket.close()
@@ -176,10 +187,42 @@ def receiver():
         # 6 Send Acknowledgement
         receiver_socket.send("Successfully received AES Key".encode())
 
-        secure_aes_key = decrypt_aes_key(encrypted_aes_key, RSAprivate_key)
+        secure_aes_key, nonce = decrypt_aes_key(encrypted_aes_key, RSAprivate_key)
 
+        print(secure_aes_key)
+        cipher = AES.new(secure_aes_key, AES.MODE_EAX, nonce)
         print("AES Key secure transmission complete")
 
+        # 8 Send file name to sender
+        file_name = input("Enter the name of the file you want to download:").strip()
+        receiver_socket.send(file_name.encode())
+
+        # 12 receive the file name and size
+        file_size = receiver_socket.recv(1024).decode()
+        print(file_name)
+        print(file_size)
+
+        file_name = "Sent" + file_name
+        file = open(file_name, "wb")
+        print("File is opened")
+
+        done = False
+
+        file_bytes = b""
+
+        # 13 receive all of the bytes of the file
+        progress = tqdm.tqdm(unit="B", unit_scale=True, unit_divisor=1000, total=int(file_size))
+        while not done:
+            data = receiver_socket.recv(1024)
+            if file_bytes[-5:] == b"<END>":
+                done = True
+            else:
+                file_bytes += data
+            progress.update(1024)
+        print(file_bytes)
+        # 14 decrypt the file
+        file.write(cipher.decrypt(file_bytes[:-5]))
+        file.close()
 
     except:
         print("Receiver Closed Unexpectedly")
