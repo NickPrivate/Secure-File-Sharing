@@ -1,13 +1,19 @@
 from prettytable import PrettyTable
 
 import socket
-import hashlib
 import sqlite3
 import threading
+import bcrypt
 
 HOST = '127.0.0.1'
 PORT = 9999
 
+def hash_and_salt(password):
+    hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    return hashed
+
+def verify_password(stored_hash, password):
+    return bcrypt.checkpw(password.encode('utf-8'), stored_hash)
 
 def domain_handle(client_socket, cur, user_id):
     while True:
@@ -46,7 +52,8 @@ def handle_registration(client_socket, cur, clientRSA, clientDSA):
         password = client_socket.recv(1024).decode().strip()
         if not password:
             continue
-        hashed_password = hashlib.sha256(password.encode('utf-8')).hexdigest()
+
+        hashed_password = hash_and_salt(password)
 
         cur.execute("SELECT * FROM Users WHERE username=?", (username,))
         if cur.fetchone() is not None:
@@ -81,20 +88,20 @@ def handle_login(client_socket, cur, clientRSA, clientDSA, key_choice):
         password = client_socket.recv(1024).decode().strip()
         if not password:
             continue
-        hashed_password = hashlib.sha256(password.encode('utf-8')).hexdigest()
 
-
-        cur.execute("SELECT * FROM Users WHERE username=? AND password=?", (username, hashed_password))
+        cur.execute("SELECT * FROM Users WHERE username=?", (username,))
         result = cur.fetchone()
-        if result and key_choice == '1': 
+        stored_hash = result[2]
+
+        if verify_password(stored_hash, password)and key_choice == '1': 
             cur.execute("UPDATE Users SET RSApublickey=?, DSApublickey=? WHERE username=?", (clientRSA, clientDSA, username))
             cur.connection.commit()
             user_id = result[0]
             client_socket.send("Login Successful && Keys Updated!\n".encode('utf-8'))
-            print(f"UserID: {user_id} | Registered Username: {username} | Registered Password hash: {password}")
+            print(f"UserID: {user_id} | Registered Username: {username} | Registered Password: {password} | Password Hash {stored_hash}")
             return user_id
 
-        elif result and key_choice == '2': 
+        elif verify_password(stored_hash, password)and key_choice == '2': 
             user_id = result[0]
             client_socket.send("Login Successful!\n".encode('utf-8'))
             print(f"UserID: {user_id} | Registered Username: {username} | Registered Password hash: {password}")

@@ -10,6 +10,7 @@
 - ```pip install pysqlite3```
 - ```pip install tqdm```
 - ```pip install prettytable```
+- ```pip install bcrypt```
 #
 
 ## Installation Instructions
