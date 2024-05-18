@@ -11,7 +11,7 @@ from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from cryptography.exceptions import InvalidSignature
 
-def sign_data(private_key, data):
+def sign_data_rsa(private_key, data):
     if isinstance(data, str):
         data = data.encode('utf-8')
     
@@ -25,7 +25,17 @@ def sign_data(private_key, data):
     )
     return signature
 
-def verify_signature(public_key, signature, data):
+def sign_data_dsa(private_key, data):
+    if isinstance(data, str):
+        data = data.encode('utf-8')
+    
+    signature = private_key.sign(
+        data,
+        hashes.SHA256()
+    )
+    return signature
+
+def verify_signature_rsa(public_key, signature, data):
     if isinstance(data, str):
         data = data.encode('utf-8')
     
@@ -42,6 +52,23 @@ def verify_signature(public_key, signature, data):
         return True
     except InvalidSignature:
         print("Verification failed: Invalid signature")
+    except Exception as e:
+        print(f"Verification failed: {e}")
+    return False
+
+def verify_signature_dsa(public_key, signature, data):
+    if isinstance(data, str):
+        data = data.encode('utf-8')
+
+    try:
+        public_key.verify(
+            signature,
+            data,
+            hashes.SHA256()
+        )
+        return True
+    except InvalidSignature:
+        print("Verification failed: Invalid DSA signature")
     except Exception as e:
         print(f"Verification failed: {e}")
     return False
@@ -150,6 +177,20 @@ def generate_rsa_keys():
 
     return pem_private.decode('utf-8'), pem_public.decode('utf-8')
 
+def signature_choice():
+    while True:
+        print("Choose the algorithm for signing:\n1 - RSA\n2 - DSA\n3 - Both")
+        choice = input().strip()
+
+        if choice == '1':
+            return choice
+        elif choice == '2':
+            return choice
+        elif choice == '3':
+            return choice
+        else:
+            print("Inalid input, please try again")
+
 RSAprivate_key, RSApublic_key = generate_rsa_keys()
 DSAprivate_key, DSApublic_key = generate_dsa_keys()
 
@@ -168,14 +209,17 @@ def sender():
     try:
         print(f"Connection from {addr}")
 
+        receiver_socket.sendall(DSApublic_key.encode())
+
+
         # Receive the receivers public key
-        receivers_pub_key = receiver_socket.recv(1024).decode()
+        receivers_pub_key_rsa = receiver_socket.recv(1024).decode()
 
         # Generate AES KEY
         secure_aes_key, nonce = generate_aes_key_and_nonce()
 
         # Encrypt AES KEY and Send IT
-        encrypted_aes_key = encrypt_aes_key(secure_aes_key, nonce, receivers_pub_key)
+        encrypted_aes_key = encrypt_aes_key(secure_aes_key, nonce, receivers_pub_key_rsa)
         receiver_socket.send(encrypted_aes_key)
 
         print("Received RSA Key")
@@ -220,10 +264,13 @@ def sender():
         cipher = AES.new(secure_aes_key, AES.MODE_EAX, nonce)
         encrypted_file = cipher.encrypt(data)
 
-        signature = sign_data(load_pem_private_key(RSAprivate_key.encode(), password=None), data)
+        signature_rsa = sign_data_rsa(load_pem_private_key(RSAprivate_key.encode(), password=None), data)
+        receiver_socket.send(signature_rsa)
 
-        # Encrypt the file with AES and send it 
-        receiver_socket.send(signature)
+        receiver_socket.recv(1024).decode()
+
+        signature_dsa = sign_data_dsa(load_pem_private_key(DSAprivate_key.encode(), password=None), data)
+        receiver_socket.send(signature_dsa)
 
         sig_received = receiver_socket.recv(1024).decode()
         print(sig_received)
@@ -248,6 +295,13 @@ def receiver():
     try:
         receiver_socket.connect((domain_name, port))
 
+        choice = signature_choice()
+
+        data1 = receiver_socket.recv(597).decode()
+        data2 = receiver_socket.recv(597).decode()
+
+        senders_public_key_dsa = data1 + data2 
+
         # Send RSA Public key
         receiver_socket.send(RSApublic_key.encode())
         # Receive encrypted AES Key
@@ -257,7 +311,7 @@ def receiver():
         receiver_socket.send("Successfully received AES Key".encode())
 
         # Receive Senders Public Key
-        senders_public_key = receiver_socket.recv(1024)
+        senders_public_key_rsa = receiver_socket.recv(1024)
         secure_aes_key, nonce = decrypt_aes_key(encrypted_aes_key, RSAprivate_key)
 
         cipher = AES.new(secure_aes_key, AES.MODE_EAX, nonce)
@@ -269,7 +323,6 @@ def receiver():
         exit()
 
     try:
-
         # Send file name to sender
         while True:
             file_name = input("Enter the name of the file you want to download:").strip()
@@ -288,7 +341,7 @@ def receiver():
         file_size = receiver_socket.recv(1024).decode()
         print(f"The file size is {file_size} Bytes")
 
-        file_name = "Received" + file_name
+        file_name = "Transferred" + file_name
         file = open(file_name, "wb")
 
         done = False
@@ -296,7 +349,10 @@ def receiver():
         file_bytes = b""
 
         # Receive the signature
-        signature = receiver_socket.recv(256)
+        signature_rsa = receiver_socket.recv(256)
+        receiver_socket.send("Sending Signature 1".encode())
+        signature_dsa = receiver_socket.recv(256)
+
 
         receiver_socket.send("Signature received".encode())
 
@@ -315,15 +371,45 @@ def receiver():
 
         decrypt = cipher.decrypt(file_bytes[:-5])
 
-        # Verify the signature
-        print("Verifying Signature...")
-        if verify_signature(serialization.load_pem_public_key(senders_public_key), signature, decrypt):
-            print("RSA Signature verified successfully")
-            file.write(decrypt)
-            print("Success, File Transfer Complete")
+        if choice == '1':
+            # Verify the signature
+            print("Verifying Signature...")
+            if verify_signature_rsa(serialization.load_pem_public_key(senders_public_key_rsa), signature_rsa, decrypt):
+                print("RSA Signature verified successfully")
+                file.write(decrypt)
+                print("Success, File Transfer Complete")
+            else:
+                print("Signature verification failed")
+                print("Fatal error, canceling file transfer") 
+
+        elif choice == '2':
+            # Verify the signature
+            print("Verifying Signature...")
+            if verify_signature_dsa(serialization.load_pem_public_key(senders_public_key_dsa.encode()), signature_dsa, decrypt):
+                print("DSA Signature verified successfully")
+                file.write(decrypt)
+                print("Success, File Transfer Complete")
+            else:
+                print("DSA Signature verification failed")
+                print("Fatal error, canceling file transfer") 
         else:
-            print("Signature verification failed")
-            print("Fatal error, canceling file transfer") 
+
+            print("Verifying RSA and DSA Signatures...")
+            if verify_signature_rsa(serialization.load_pem_public_key(senders_public_key_rsa), signature_rsa, decrypt):
+                print("RSA Signature verified successfully")
+                file.write(decrypt)
+            else:
+                print("Signature verification failed")
+                print("Fatal error, canceling file transfer") 
+
+            if verify_signature_dsa(serialization.load_pem_public_key(senders_public_key_dsa.encode()), signature_dsa, decrypt):
+                print("DSA Signature verified successfully")
+                print("GREAT NEWS!\nBoth RSA and DSA signatures verified")
+                print("Success, File Transfer Complete")
+                file.write(decrypt)
+            else:
+                print("DSA Signature verification failed")
+                print("Fatal error, canceling file transfer") 
 
         file.close()
 
