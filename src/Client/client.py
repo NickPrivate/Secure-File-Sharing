@@ -137,6 +137,19 @@ def decrypt_aes_key(encrypted_aes_key_and_nonce, private_key_pem):
 
     return aes_key, nonce
 
+def public_key_check(RSA, DSA):
+    try:
+        while True:
+            choice = input("Before continuing, do you want to verify the senders key?\nY/N")
+            if choice.lower() == 'y':
+                print(RSA)
+                print(DSA)
+                break
+            else:
+                continue
+    except:
+        print("Error with public_key_check()")
+
 def signature_choice():
     while True:
         print("Choose the algorithm for signing:\n1 - RSA\n2 - DSA\n3 - Both")
@@ -150,6 +163,34 @@ def signature_choice():
             return choice
         else:
             print("Inalid input, please try again")
+
+def choose_domain():
+    try:
+        while True:
+            domain = input("Enter the domain or enter d for defaults (127.0.0.1, 5000): ")
+
+            if domain.lower() == 'd':
+                domain = '127.0.0.1'
+                port = 5000
+                return domain, port
+
+            if len(domain) < 7 or len(domain) > 16:
+                print("Domain must be in IPV4 format and between 7-15 characters long")
+                continue
+
+            port = input("Enter the port number: ")
+            port = int(port)
+            if not 0 < port < 65536:
+                print("Port number must be between 1 and 65536")
+                continue
+            return domain,port
+    except:
+        print("Error in choose_domain()")
+        domain = '127.0.0.1'
+        port = 5000
+        return domain,port
+
+
 
 def receive_full_message(sock):
     buffer = []
@@ -355,9 +396,8 @@ def sender(RSApublic_key, RSAprivate_key, DSApublic_key, DSAprivate_key):
 
 def receiver(RSApublic_key, RSAprivate_key):
     receiver_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    domain_name = '127.0.0.1'
-    port = 5000
 
+    domain_name, port = choose_domain()
     try:
         receiver_socket.connect((domain_name, port))
 
@@ -387,6 +427,8 @@ def receiver(RSApublic_key, RSAprivate_key):
         print("Receiver() Error with Key Transfer")
         receiver_socket.close()
         exit()
+
+    public_key_check(senders_public_key_rsa.decode(), senders_public_key_dsa)
 
     try:
         # Send file name to sender

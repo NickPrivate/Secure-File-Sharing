@@ -3,4 +3,15 @@ src/Client/rsa_private.pem
 src/Client/dsa_public.pem
 src/Client/dsa_private.pem
 
+
+test/user1/rsa_public.pem
+test/user1/rsa_private.pem
+test/user1/dsa_public.pem
+test/user1/dsa_private.pem
+
+test/user2/rsa_public.pem
+test/user2/rsa_private.pem
+test/user2/dsa_public.pem
+test/user2/dsa_private.pem
+
 src/TestEnvironmentP2P/
