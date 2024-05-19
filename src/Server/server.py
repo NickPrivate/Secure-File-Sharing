@@ -91,14 +91,20 @@ def handle_login(client_socket, cur, clientRSA, clientDSA, key_choice):
 
         cur.execute("SELECT * FROM Users WHERE username=?", (username,))
         result = cur.fetchone()
+
+        if result == None:
+            client_socket.send("Login Failed. Try again.\n".encode('utf-8'))
+            continue
+
         stored_hash = result[2]
+
 
         if verify_password(stored_hash, password)and key_choice == '1': 
             cur.execute("UPDATE Users SET RSApublickey=?, DSApublickey=? WHERE username=?", (clientRSA, clientDSA, username))
             cur.connection.commit()
             user_id = result[0]
             client_socket.send("Login Successful && Keys Updated!\n".encode('utf-8'))
-            print(f"UserID: {user_id} | Registered Username: {username} | Registered Password: {password} | Password Hash {stored_hash}")
+            print(f"UserID: {user_id} | Registered Username: {username} | Password Hash {stored_hash}")
             return user_id
 
         elif verify_password(stored_hash, password)and key_choice == '2': 
@@ -207,7 +213,7 @@ def receive_full_message(sock):
                 break
             buffer.append(part)
     except socket.timeout:
-        print("Socket timed out waiting for data.")
+        print("Data Received")
     finally:
         sock.settimeout(None)
     return b''.join(buffer)
