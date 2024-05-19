@@ -2,7 +2,7 @@ src/Client/rsa_public.pem
 src/Client/rsa_private.pem
 src/Client/dsa_public.pem
 src/Client/dsa_private.pem
-
+src/Client/photo.jpg
 
 test/user1/rsa_public.pem
 test/user1/rsa_private.pem
