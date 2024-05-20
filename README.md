@@ -14,7 +14,8 @@
    - [Key Distribution](#key-distribution)
    - [File Encryption and Integrity Verification](#file-encryption-and-integrity-verification)
 7. [Usage](#usage)
-8. [License](#license)
+8. [Contributors](#contributors)
+9. [License](#license)
 
 ## Introduction
 This project demonstrates a secure file-sharing system implemented in Python. It covers various topics such as low-level socket programming, cryptographic principles, concurrent server architecture, and secure key distribution. The project aims to provide a comprehensive learning experience for those interested in secure communication and file transfer.
@@ -106,8 +107,15 @@ The project implements a secure key distribution mechanism and encrypted file tr
    ```bash
    cd test/user2
    python client.py
+   
+## Contributors
+
+- **Katherine Joy Guardiano** - Architecture Design
+- **Allen Dai** - Tools and Project Testing
+- **Andy Huynh** - Security Protocol Designer
+- **Nick Goulart** - Implementation and Key Distribution
+- **Dylan Zuniga** - Database Modeling and Queries
 
 ## License
-This project was made by Nick Goulart, Katherine Joy Guardiano, Dylan Zuniga, Allen Dai, and Andy Huynh. © Copyright 2024.
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
