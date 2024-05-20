@@ -92,17 +92,17 @@ The project implements a secure key distribution mechanism and encrypted file tr
 ## Usage
 
 1. **Start the Indexing Server**:
-   - Navigate to the `Server` directory and run `server.py`.
+   - Navigate to the `Server` directory and run `server.py`
    ```bash
    cd src/Server
    python server.py
 2. **Start User 1 (sender)**:
-   - Navigate to the `user` directory and run `client.py`.
+   - Navigate to `user1` inside the `test` directory and run `client.py`
    ```bash
    cd test/user1
    python client.py
 3. **Start User 2 (receiver)**:
-   - Navigate to the `user` directory and run `client.py`.
+   - Navigate to `user2` inside the `test` directory and run `client.py`
    ```bash
    cd test/user2
    python client.py
