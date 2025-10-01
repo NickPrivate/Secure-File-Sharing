@@ -1,43 +1,75 @@
-# Secure File Sharing
+# Encrypted File Transfer Platform with Digital Signatures
 
-## Table of Contents
-1. [Introduction](#introduction)
-2. [Requirements](#requirements)
-3. [Dependencies](#dependencies)
-4. [Installation Instructions](#installation-instructions)
-5. [Project Overview](#project-overview)
-   - [Low-Level Sockets Programming](#low-level-sockets-programming)
-   - [Cryptographic Principles](#cryptographic-principles)
-   - [Concurrent Server and Database](#concurrent-server-and-database)
-   - [Secure Key Distribution and Encrypted File Transfer](#secure-key-distribution-and-encrypted-file-transfer)
-6. [Security Protocols](#security-protocols)
-   - [Key Distribution](#key-distribution)
-   - [File Encryption and Integrity Verification](#file-encryption-and-integrity-verification)
-7. [Usage](#usage)
-8. [Contributors](#contributors)
-9. [License](#license)
+[![Python 3.12+](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/downloads/)  [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)  ![Platform](https://img.shields.io/badge/Platform-Ubuntu%2024.04%2B-orange) ![Platform](https://img.shields.io/badge/Platform-Windows_10/11-orange) ![Platform](https://img.shields.io/badge/Platform-Mac_OS-orange)
 
 ## Introduction
-This project demonstrates a secure file-sharing system implemented in Python. It covers various topics such as low-level socket programming, cryptographic principles, concurrent server architecture, and secure key distribution. The project aims to provide a comprehensive learning experience for those interested in secure communication and file transfer.
+The **Secure File Sharing System** is a Python-based application that combines **network programming** and **modern cryptography** to enable confidential, authenticated file transfers over untrusted networks.  
+
+The system demonstrates how to integrate:  
+- **Low-level socket programming** for peer-to-peer and client-server communication  
+- **Hybrid cryptography** (RSA for key exchange, AES for data encryption, RSA/DSA for digital signatures)  
+- **Concurrent server design** using threading and SQLite for scalable session and metadata management  
+- **Custom security protocols** for key distribution, file encryption, and integrity verification  
+
+This project goes beyond a simple file transfer utility, it illustrates how secure communication systems are engineered from the ground up. It is intended both as a practical tool and as a learning resource for topics in **secure networking, distributed systems, and applied cryptography**.
+
+---
+
+## Features
+- Peer-to-peer tamper-proof file transfer over TCP sockets
+- Live download progress bar
+- Supports files of any size
+- Secure hybrid cryptography (RSA + AES)  
+- Digital signatures for authenticity and integrity  
+- Concurrent authoritative indexing server with SQLite backend  
+- Custom socket protocols for encrypted file sharing
+
+---
 
 ## Requirements
-- Python 3
-  - [Download Python 3](https://www.python.org/downloads/)
+[Download Python 3](https://www.python.org/downloads/)
+ 
+---
 
 ## Dependencies:
-Install the following Python libraries using `pip`:
-- ```pip install cryptography```
-- ```pip install pycryptodome```
-- ```pip install pysqlite3```
-- ```pip install tqdm```
-- ```pip install prettytable```
-- ```pip install bcrypt```
+Install the following Python dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+---
 
 ## Installation Instructions
 
 Clone the project to your local machine using Git.
 
-   ```git clone https://github.com/NickPrivate/Secure-File-Sharing```
+```bash
+git clone https://github.com/NickPrivate/Secure-File-Sharing
+```
+
+---
+
+## Usage
+
+1. **Start the Indexing Server**:
+   - Navigate to the `Server` directory and run `server.py`
+   ```bash
+   cd src/Server
+   python server.py
+   ```
+2. **Start User 1 (sender)**:
+   - Navigate to `user1` inside the `test` directory and run `client.py`
+   ```bash
+   cd test/user1
+   python client.py
+   ```
+3. **Start User 2 (receiver)**:
+   - Navigate to `user2` inside the `test` directory and run `client.py`
+   ```bash
+   cd test/user2
+   python client.py
+   ```
+---
 
 ## Project Overview
 
@@ -64,6 +96,8 @@ The project implements a secure key distribution mechanism and encrypted file tr
 - **File Encryption**: The file is encrypted using AES.
 - **File Transfer**: Custom socket protocols are used for transmitting the encrypted file and keys.
 
+---
+
 ## Security Protocols
 
 ### Key Distribution
@@ -89,33 +123,35 @@ The project implements a secure key distribution mechanism and encrypted file tr
    - The receiver decrypts the file using the AES key.
 5. **Integrity Verification**:
    - The receiver verifies the file's integrity using the RSA/DSA signature. If verification fails, the download is canceled; if it succeeds, the file is downloaded.
+  
+## Secure File Transfer Workflow
 
-## Usage
+```mermaid
+sequenceDiagram
+    participant Sender as Sender (Server)
+    participant Receiver as Receiver (Client)
 
-1. **Start the Indexing Server**:
-   - Navigate to the `Server` directory and run `server.py`
-   ```bash
-   cd src/Server
-   python server.py
-2. **Start User 1 (sender)**:
-   - Navigate to `user1` inside the `test` directory and run `client.py`
-   ```bash
-   cd test/user1
-   python client.py
-3. **Start User 2 (receiver)**:
-   - Navigate to `user2` inside the `test` directory and run `client.py`
-   ```bash
-   cd test/user2
-   python client.py
-   
+    Note over Sender,Receiver: Key Exchange Phase
+    Receiver->>Sender: Sends public key
+    Sender->>Sender: Generate AES key
+    Sender->>Receiver: Encrypt AES key with receiver's public key
+    Receiver->>Receiver: Decrypt AES key with private key
+    Note over Sender,Receiver: AES key securely exchanged
+
+    Note over Sender,Receiver: File Transfer Phase
+    Receiver->>Sender: "Ready for file"
+    Sender->>Sender: Encrypt file with AES key
+    Sender->>Receiver: Send encrypted file
+    Receiver->>Receiver: Decrypt file using AES key
+    Receiver->>Sender: "Success"
+    Sender->>Receiver: End communication
+```
+
 ## Contributors
+- **Nick Goulart** - Creator and maintainer
 
-- **Katherine Joy Guardiano** - Architecture Design
-- **Allen Dai** - Tools and Project Testing
-- **Andy Huynh** - Security Protocol Designer
-- **Nick Goulart** - Implementation and Key Distribution
-- **Dylan Zuniga** - Database Modeling and Queries
+---
 
 ## License
-
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
