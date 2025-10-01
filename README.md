@@ -1,6 +1,6 @@
 # Encrypted File Transfer Platform with Digital Signatures
 
-[![Python 3.12+](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/downloads/)  [![License: MIT](https://img.shields.io/badge/License-GPL_2.0-green.svg)](LICENSE)  ![Platform](https://img.shields.io/badge/Platform-Ubuntu%2024.04%2B-orange) ![Platform](https://img.shields.io/badge/Platform-Windows_10/11-orange) ![Platform](https://img.shields.io/badge/Platform-Mac_OS-orange)
+[![Python 3.12+](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/downloads/)  [![License: MIT](https://img.shields.io/badge/License-GPL--2.0-green.svg)](LICENSE)  ![Platform](https://img.shields.io/badge/Platform-Ubuntu%2024.04%2B-orange) ![Platform](https://img.shields.io/badge/Platform-Windows_10/11-orange) ![Platform](https://img.shields.io/badge/Platform-Mac_OS-orange)
 
 ## Introduction
 The **Secure File Sharing System** is a Python-based application that combines **network programming** and **modern cryptography** to enable confidential, authenticated file transfers over untrusted networks.  
@@ -154,5 +154,6 @@ sequenceDiagram
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
 
 
