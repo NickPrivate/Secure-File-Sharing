@@ -1,0 +1,6 @@
+cryptography==43.0.1
+pycryptodome==3.20.0
+pysqlite3-binary==0.5.2.post3
+tqdm==4.66.4
+prettytable==3.10.2
+bcrypt==4.2.0
